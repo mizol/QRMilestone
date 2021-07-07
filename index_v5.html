@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+  <title>Scan Runners</title>
+
+  <script src="./jsQR.js"></script>
+  
+  <link href="https://fonts.googleapis.com/css?family=Ropa+Sans" rel="stylesheet">
+
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.10.25/b-1.7.1/b-html5-1.7.1/sl-1.3.3/datatables.min.css"/>
+  <!-- <link href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css" rel="stylesheet"> -->
+  
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  
+  <!-- Blob static website doc https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website -->
+
+  <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css" integrity="sha384-AYmEC3Yw5cVb3ZcuHtOA93w35dYTsvhLPVnYs9eStHfGJvOvKxVfELGroGkvsg+p" crossorigin="anonymous"/>
+
+  <link rel="stylesheet" href="style.css">
+  
+</head>
+
+<!-- TODO 
+
+  https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website-host
+
+1) local storage load, update, clear
+2) Grid add new row manually, add new row SCAN
+3) Grid navigation
+4) Sync local stotage, where to send (blob?), data format?
+5) start/stop scan +/+
+6) show popup / clouse it on scan success +/+.
+7) local storage data normalize +
+8) grid array model to object model + parse data for save + number grid count.
+
+26/06
+1) object parse +
+2) show multiple scan info -
+3) Data table edit -
+4) Grid scroll panel -
+
+show row index
+
+delete column - row index
+
+var index = row.index();
+row.child( format(row.data()), 'no-padding row-' + index ).show();
+tr.addClass('shown');
+ 
+$('tr.row-' + index).insertBefore(tr);
+-->
+
+
+<body>
+
+  <section class="container-fluid p-0">
+    <div class="d-flex flex-column">
+      <nav class="navbar navbar-expand-md bg-dark navbar-dark">
+        <!-- Toggler/collapsibe Button -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbar">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <!-- Navbar links -->
+        <div class="collapse navbar-collapse" id="collapsibleNavbar">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="">Export to Excel</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="clearGridStorage()">Clear Storage</a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+  </section>
+  
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col pl-3"><h2>Results</h2></div>
+      <div class="col pr-3"><div style="float: right;"><h2 id="dateStamp"></h2></div></div>
+    </div>
+        
+    <div class="container-fluid"></div>
+    <div class="row">
+      <div class="col-md-4">
+        <button type="button" class="btn btn-warning f-width mb-2 f-btn" onclick="addResultTimingRow()">No BIB</button>
+      </div>
+      <div class="col-md-4">
+        <button type="button" class="btn btn-success f-width mb-2">
+          <div id="timedate">
+            <a id="time_h">00</a>:
+            <a id="time_m">00</a>:
+            <a id="time_s">00</a>.
+            <a id="time_ms">0</a>
+          </div>
+        </button>
+      </div>
+      <div class="col-md-4">
+        <button type="button" class="btn btn-warning f-width f-btn" data-toggle="modal" data-target="#videoModal" onclick="doScan()">Scan QR Code</button>
+      </div>
+    </div>
+      <div class="row">
+        <div class="col col-s-12 col-md-4">
+          <!-- <button type="button" class="btn btn-warning f-width mb-2" onclick="addResultTimingRow()">No BIB</button> -->
+        </div>
+
+        <div class="col col-s-12 col-md-4 mr-2 ml-2 ">
+          <!-- <button type="button" class="btn btn-success f-width mb-2">
+            <div id="timedate">
+              <a id="time_h">00</a>:
+              <a id="time_m">00</a>:
+              <a id="time_s">00</a>.
+              <a id="time_ms">0</a>
+            </div>
+          </button> -->
+          
+          <!-- <button id="headerClock" type="button" class="btn btn-success f-width">Current Time</button> -->
+        </div>
+        <div class="col col-s-12 col-md-4 mb-2">
+          <!-- <button type="button" class="btn btn-warning f-width" data-toggle="modal" data-target="#videoModal" onclick="doScan()">Scan QR Code</button> -->
+        </div>
+
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <!-- <button type="button" class="btn btn-warning f-width mb-2" data-toggle="modal" data-target="#videoModal" onclick="doScan()">SCAN QR</button> -->
+          <!-- <button type="button" class="btn btn-warning f-width mb-2" onclick="stopScan()">Stop SCAN</button> -->
+          <!-- <button type="button" class="btn btn-warning f-width mb-2" onclick="confirmRemoveSelectedRow()">Remove</button> -->
+        </div>
+      </div>
+
+      <div class="scrollGridY grid-wrapper">
+        <table id="example" class="display" width="100%"></table>
+      </div>
+  </div>
+
+  
+  <!-- <div><input type='button' value="Scan" onclick="doScan()"></input></div> -->
+  
+  <!-- Video modal Container -->
+  <!-- Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="pad05rem">
+        <button type="button" class="btn btn-secondary f-width" data-dismiss="modal">Close</button>
+      </div>
+      <div class="pad05rem-notop">
+        <div id="loadingMessage">Unable to access video stream (please make sure you have a webcam enabled)</div>
+        <div id="output" hidden>
+          <div id="outputMessage" class="mb-2">No QR code detected.</div>
+          <div hidden class="scan-info"><span id="outputData"></span></div>
+        </div>
+        <canvas id="canvas"></canvas>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+
+  <!-- JS script -->
+  <!-- https://cdnjs.com/libraries/jquery/3.2.1 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha512-3P8rXCuGJdNZOnUx/03c1jOTnMn3rP63nBip5gOP2qmUh5YAdVAvFZ1E+QLZZbC1rtMrQb+mah3AfYW11RUrWA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <!-- <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script> -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  
+  <!-- <script src="./moment.js"></script> -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js" integrity="sha512-qTXRIMyZIFb8iQcfjXWCO8+M5Tbc38Qi5WzdPOYZHIlZpzBHG3L3by84BBBOiRGiEb7KKtAOAs5qYdUiZiQNNQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script type="text/javascript" src="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.10.25/b-1.7.1/b-html5-1.7.1/sl-1.3.3/datatables.min.js"></script>
+
+  <!-- <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script> -->
+
+  <script>
+
+// show header time
+var resultTable = null;
+var dataSet = [];
+
+$(function() {
+
+  $('#videoModal').on('hidden.bs.modal', function () {
+    stopScan();
+
+    lastScanPersonData = null;
+     outputData.innerText = '';
+     outputMessage.hidden = false;
+     outputData.parentElement.hidden = true;
+  });
+
+  window.onbeforeunload = () => {
+    if(resultTable) {
+      updateGridStorageData(resultTable.data().toArray());
+    }
+  }
+
+  initClock();
+  
+  // https://editor.datatables.net/examples/api/softDelete
+  // delete how to
+  $.extend( true, $.fn.dataTable.defaults, {
+    "searching": false,
+    "ordering": true,
+    "paging": false,
+  } );
+  
+
+  //debugger;
+  dataSet = getGridStorageData() || [];
+  resultTable = $('#example').DataTable( {
+        data: dataSet,
+        //destroy: true,
+        dom: 'Bfrtip',
+        //buttons: ['excel'],
+        select: {style: 'single'},
+        autoWidth: true,
+        columns: [
+            { data: 'Seq', width: "8px" },
+            { data: 'bib', width: "12px" },
+            { data: 'fullName' },
+            { data: 'timestamp', width: "10px" }
+            //{ data: 'delete', width: "10px" }
+        ],
+        buttons: [ 'excel',
+          {
+            extend: 'selectedSingle',
+            text: 'Update',
+            action: function ( e, dt, button, config ) {
+                console.log( dt.row( { selected: true } ).data() );
+            }
+          },
+          {
+            extend: 'selectedSingle',
+            text: 'Delete',
+            action: function ( e, dt, button, config ) {
+              debugger;
+              var selectedIndex = dt.data().rows('.selected')[0];
+              var model = dt.data().toArray()[selectedIndex];
+
+              confirmRemoveSelectedRow(model);
+                console.log({data2: dt.row( { selected: true } ).data() });
+            }
+          }
+        ]
+    } );
+
+    resultTable.buttons().container().appendTo( $('.col-sm-6:eq(0)', resultTable.table().container() ) );
+    //var dt = resultTable.data();
+});
+
+// START CLOCK SCRIPT
+
+Number.prototype.pad = function(n) {
+  for (var r = this.toString(); r.length < n; r = 0 + r);
+  return r;
+};
+
+var tags = ["time_h", "time_m", "time_s", "time_ms"];
+
+function updateClock() {
+  // Show ms https://codepen.io/jasonleewilson/pen/gPrxwX
+  var now = new Date();
+
+  var millis = now.getMilliseconds();
+  var currSeconds = now.getSeconds();
+  var currMinutes = now.getMinutes();
+  var currHours = now.getHours();
+  
+  var corr = [currHours, currMinutes, currSeconds, (''+millis)[0]];
+
+  for (var i = 0; i < tags.length; i++)
+  {
+    document.getElementById(tags[i]).firstChild.nodeValue = corr[i];
+  }
+}
+
+function initClock() {
+
+  var headerDate = $('#dateStamp');
+  var now = new moment();
+  headerDate.text(now.format("DD MMM YYYY"));
+
+  updateClock();
+  window.setInterval("updateClock()", 100);
+}
+
+// END CLOCK SCRIPT
+
+function getTimeStamp() {
+  var now = new moment();
+  return now.format("HH:mm:ss.S");
+}
+
+function onShowCurrentTime(timePanel) {
+  // Show ms https://codepen.io/jasonleewilson/pen/gPrxwX
+
+  var now = new moment();
+  var currentTime = getTimeStamp();
+  timePanel.text(currentTime);
+}
+
+// Grid model
+// https://datatables.net/
+//https://www.thewwwmagazine.com/6-best-data-grid-controls-to-use-in-2020/
+
+var gridModel = [];
+
+function addNewRow(personObject, timeStamp) {
+
+    //var totalRows = resultTable.data().length + 1;
+    //personObject.Id = totalRows;
+    
+    resultTable.row.add(personObject).draw().node();
+    resultTable.state.save();
+}
+
+function parseQRCode(personJson) {
+  //debugger;
+  console.log({parseQRCode_Scan: {personJson}});
+
+  var personModel1 = { bib: Math.floor(Math.random() * 100), fullName: "Oleh Mizyurko" + Math.floor(Math.random() * 100) };
+  //var personModel1 = { bib: 101, fullName: "Oleh Mizyurko" + 101 };
+  personJson = JSON.stringify(personModel1);
+
+  if(!personJson)
+  {
+    console.warn({parseQRCode: "person model is undefined"});
+    return;
+  }
+
+  var personObject = null;
+  try {
+    personObject = JSON.parse(personJson);
+
+    if(!personObject) {
+      console.warn({parseQRCode_Parse: "Null income model"});
+    }
+
+    console.log({parseQRCode_Model: personObject});
+        
+    return personObject;
+  } 
+  catch(e)
+  {
+    console.error({parseQRCode: "JSON.parse failed to parse person model", error: e});
+  }  
+
+  return null;
+}
+
+// Dat aTable edit
+function loadGridData() {
+  //
+}
+
+function addResultTimingRow() {
+  //addNewRow();
+  var personObject = { Seq: '', bib: '', fullName: '', timestamp: getTimeStamp(), delete: '<span class="fas fa-camera"></span>' };
+  resultTable.row.add(personObject).draw().node();
+  resultTable.state.save();
+}
+
+function updateGridRow(id) {
+  //
+}
+
+function updateGridStorageData(gridModel) {
+  localStorage.setItem("gridModel", JSON.stringify(gridModel));
+}
+
+function getGridStorageData() {
+  return JSON.parse(localStorage.getItem("gridModel"));
+}
+
+function clearGridStorage() {
+  localStorage.removeItem("gridModel");
+
+  if(!resultTable)
+    return;
+
+  resultTable.clear().draw();
+}
+
+
+var video = document.createElement("video");
+var canvasElement = document.getElementById("canvas");
+var canvas = canvasElement.getContext("2d");
+var loadingMessage = document.getElementById("loadingMessage");
+var outputContainer = document.getElementById("output");
+var outputMessage = document.getElementById("outputMessage");
+var outputData = document.getElementById("outputData");
+
+function stopScan() {
+    // https://stackoverflow.com/questions/11642926/stop-close-webcam-stream-which-is-opened-by-navigator-mediadevices-getusermedia
+    if(!video.srcObject)
+      return;
+
+    video.srcObject.getTracks().forEach(function(track) {
+        track.stop();
+      });
+
+    video.srcObject = null;
+    canvas.clearRect(0, 0, canvasElement.width, canvasElement.height);
+}
+
+function doScan() {
+
+		// Use facingMode: environment to attemt to get the front camera on phones
+		navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: "environment", frameRate: { ideal: 10, max: 15 } } })
+			.then(function(stream) {
+			  video.srcObject = stream;
+			  video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
+			  video.play();
+			  
+			  requestAnimationFrame(tick);
+
+			}).catch(function(err) {
+        console.error({doScan: err});
+      });
+	}
+	
+  function drawLine(begin, end, color) {
+    canvas.beginPath();
+    canvas.moveTo(begin.x, begin.y);
+    canvas.lineTo(end.x, end.y);
+    canvas.lineWidth = 2;
+    canvas.strokeStyle = color;
+    canvas.stroke();
+  }
+
+  var IsScanDelayOn = false;
+  var lastScanPersonData = null;
+
+  function tick() {
+    if(IsScanDelayOn)
+    {
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    loadingMessage.innerText = "Loading video...";
+	  
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      loadingMessage.hidden = true;
+      outputContainer.hidden = false;
+
+    // <div id="outputMessage" class="mb-2">No QR code detected.</div>
+    //       <div hidden class="scan-info"><span id="outputData"></span></div>
+
+    //  outputMessage.hidden = false;
+    //  outputData.parentElement.hidden = true;
+
+      canvasElement.hidden = false;
+      canvasElement.height = video.videoHeight;
+      canvasElement.width = video.videoWidth;
+      
+      canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+      var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+      
+      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert", });
+		  if (code)  {
+        var scanTime = getTimeStamp();
+
+        drawRectangleOverFoundQRCode(code, '#00FF00')
+
+        //stopScan();
+        //debugger;
+        lastScanPersonData = parseQRCode(code.data);
+        if(lastScanPersonData) {
+          lastScanPersonData.timestamp = scanTime;
+          debugger;
+          // https://datatables.net/examples/api/regex.html
+          if(!IsBibExists(lastScanPersonData.bib))
+          {
+            addNewRow(lastScanPersonData);
+
+            IsScanDelayOn = true;
+            window.setInterval("resetSkipTimer()", 2000);
+            //$('#videoModal').modal('hide');         
+          }
+        }
+      }
+      
+      showOutputMessage(lastScanPersonData);
+    }
+	  
+    requestAnimationFrame(tick);
+  }
+
+  function confirmRemoveSelectedRow(model) {
+    var confirmMessage = "Are you sure?";
+    if (model) {
+      if(model.bib){
+        confirmMessage += " Record - bib:'" + model.bib +"'";
+      }
+
+      if(model.fullName){
+        confirmMessage += " fullName:'" + model.fullName +"'";
+      }
+
+      if(model.timestamp){
+        confirmMessage += " timestamp:'" + model.timestamp +"'";
+      }
+
+      confirmMessage += " will be removed.";
+    }
+
+    var result = confirm(confirmMessage);
+    if (result) {
+      removeSelectedRow();
+    }
+  }
+
+  function removeSelectedRow() {
+    debugger;
+    //resultTable.rows('.selected').remove().draw();
+    //resultTable.state.save();
+
+    var rows = $('#example').DataTable()
+      .rows('.selected')
+      .remove()
+      .draw();
+
+    $('#example').DataTable().state.save();
+
+    //   var dt = $('#example').DataTable().data();
+
+      updateGridStorageData(resultTable.data().toArray());
+  }
+
+  function IsBibExists(value) {
+    if(!resultTable)
+      return true;
+
+    var gridDs = resultTable.data();
+    if(gridDs.length === 0)
+      return false;
+
+    var isExists = false;
+    var ds = resultTable.data().toArray();
+    ds.forEach(function callback(currentValue, index, array) {
+      debugger;
+        if (currentValue.bib === value) {
+          isExists = true;
+          return;
+        }
+    });
+
+    return isExists;
+  }
+
+  function resetSkipTimer(){
+    IsScanDelayOn = false; 
+  }
+
+	function drawRectangleOverFoundQRCode(code, color) {
+		//00FF00 FF3B58
+		drawLine(code.location.topLeftCorner, code.location.topRightCorner, color);
+		drawLine(code.location.topRightCorner, code.location.bottomRightCorner, color);
+		drawLine(code.location.bottomRightCorner, code.location.bottomLeftCorner, color);
+		drawLine(code.location.bottomLeftCorner, code.location.topLeftCorner, color);
+	}
+	
+  function showOutputMessage(lastScanPersonData) {
+    if(!lastScanPersonData)
+      return;
+
+    var returnScan = lastScanPersonData.bib + ' ' + lastScanPersonData.fullName;
+    
+    if (returnScan) {
+      outputData.innerText = returnScan;
+
+      outputMessage.hidden = true;
+      outputData.parentElement.hidden = false;
+    }
+    else 
+    {
+      //outputMessage.hidden = false;
+      //outputData.parentElement.hidden = true;
+    }
+  }
+  </script>
+</body>
+</html>
